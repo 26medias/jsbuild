@@ -12,12 +12,16 @@ var builder = function(options) {
 	this.options	= options;
 	this.data		= {};	// placeholder for build.json data
 }
-builder.prototype.build = function() {
+builder.prototype.build = function(versionType) {
 	var scope 	= this;
 	
 	this.filesContent = [];
 	
 	var timeStart = new Date().getTime();
+	
+	if (!versionType) {
+		versionType = 'build';
+	}
 	
 	// Get the conf file (build.json)
 	this.getConf(function() {
@@ -37,138 +41,158 @@ builder.prototype.build = function() {
 					});
 				});
 			});
-			stack.process(function() {
+			
+			// Update the build number
+			scope.incrementVersion(versionType, function(versions) {
 				
-				var processStack = new toolset.stack();
-				var concat = {};
-				
-				// Concat the files in order, by type
-				_.each(scope.filesContent, function(fileData) {
-					if (!concat[fileData.type]) {
-						concat[fileData.type] = "";
+				stack.process(function() {
+					
+					var processStack = new toolset.stack();
+					var concat = {};
+					
+					// Concat the files in order, by type
+					_.each(scope.filesContent, function(fileData) {
+						if (!concat[fileData.type]) {
+							concat[fileData.type] = "";
+						}
+						concat[fileData.type] += fileData.content;
+					});
+					
+					var buildResult = {
+						dev:	[],
+						prod:	[]
+					};
+					
+					// Write and post-process the files
+					var ext;
+					for (ext in concat) {
+						processStack.add(function(p, cb) {
+							// get the data
+							var filename 	= path.basename(scope.data.filename, path.extname(scope.data.filename));
+							var tempFilename= path.relative(__dirname, path.normalize(scope.options.directory+'/'+scope.data.output+'/'+filename+'.tmp'+p.ext));
+							var outputDev	= path.relative(__dirname, path.normalize(scope.options.directory+'/'+scope.data.output+'/'+filename+'-'+versions.new+'.dev'+p.ext));
+							var outputProdV	= path.relative(__dirname, path.normalize(scope.options.directory+'/'+scope.data.output+'/'+filename+'-'+versions.new+'.min'+p.ext));
+							var outputProd	= path.relative(__dirname, path.normalize(scope.options.directory+'/'+scope.data.output+'/'+filename+'.min.latest'+p.ext));
+							console.log("tempFilename",tempFilename);
+							// Save the versions
+							buildResult.dev.push(path.relative(scope.options.directory, outputDev));
+							buildResult.prod.push(path.relative(scope.options.directory, outputProd));
+							
+							// Save the file, uncompressed
+							toolset.file.write(outputDev, concat[p.ext], function() {
+								// Post-process the files if necessary
+								switch (p.ext) {
+									case ".js":
+										// Minify
+										toolset.file.exists(outputDev, function(exists) {
+											if (exists) {
+												new compressor.minify({
+													type: 		'yui-js',
+													fileIn: 	outputDev,
+													fileOut: 	tempFilename,
+													callback: 	function(err, min){
+														if (err) {
+														} else {
+															min = scope.getOutputheader(versions.new)+min;
+															scope.saveAs([outputProd, outputProdV], min, function() {
+																toolset.file.removeFile(tempFilename, function() {
+																	cb();
+																});
+															});
+														}
+													}
+												});
+											} else {
+												console.log("File "+outputDev+" *DOT NOT* exists.");
+											}
+										});
+										
+									break;
+									case ".css":
+										// Minify
+										toolset.file.exists(outputDev, function(exists) {
+											if (exists) {
+												new compressor.minify({
+													type: 		'yui-css',
+													fileIn: 	outputDev,
+													fileOut: 	tempFilename,
+													callback: 	function(err, min){
+														if (err) {
+														} else {
+															min = scope.getOutputheader(versions.new)+min;
+															scope.saveAs([outputProd, outputProdV], min, function() {
+																toolset.file.removeFile(tempFilename, function() {
+																	cb();
+																});
+															});
+														}
+													}
+												});
+											} else {
+												console.log("File "+outputDev+" *DOT NOT* exists.");
+											}
+										});
+										
+									break;
+									default:
+										cb();
+									break;
+								}
+							});
+							
+							
+							
+						}, {ext:ext});
 					}
-					concat[fileData.type] += fileData.content;
-				});
-				
-				var buildResult = {
-					dev:	[],
-					prod:	[]
-				};
-				
-				// Write and post-process the files
-				var ext;
-				for (ext in concat) {
-					processStack.add(function(p, cb) {
-						// get the data
-						var filename 	= path.basename(scope.data.filename, path.extname(scope.data.filename));
-						var outputDev	= path.relative(__dirname, path.normalize(scope.options.directory+'/'+scope.data.output+'/'+filename+'.dev'+p.ext));
-						var outputProd	= path.relative(__dirname, path.normalize(scope.options.directory+'/'+scope.data.output+'/'+filename+'.min'+p.ext));
+					
+					processStack.process(function() {
 						
-						buildResult.dev.push(path.relative(scope.options.directory, outputDev));
-						buildResult.prod.push(path.relative(scope.options.directory, outputProd));
-						
-						// Save the file, uncompressed
-						toolset.file.write(outputDev, concat[p.ext], function() {
-							// Post-process the files if necessary
-							switch (p.ext) {
-								case ".js":
-									// Minify
-									toolset.file.exists(outputDev, function(exists) {
-										if (exists) {
-											new compressor.minify({
-												type: 		'yui-js',
-												fileIn: 	outputDev,
-												fileOut: 	outputProd,
-												callback: 	function(err, min){
-													if (err) {
-													} else {
-														cb();
-													}
-												}
-											});
-										} else {
-											console.log("File "+outputDev+" *DOT NOT* exists.");
-										}
-									});
-									
-								break;
-								case ".css":
-									// Minify
-									toolset.file.exists(outputDev, function(exists) {
-										if (exists) {
-											new compressor.minify({
-												type: 		'yui-css',
-												fileIn: 	outputDev,
-												fileOut: 	outputProd,
-												callback: 	function(err, min){
-													if (err) {
-													} else {
-														cb();
-													}
-												}
-											});
-										} else {
-											console.log("File "+outputDev+" *DOT NOT* exists.");
-										}
-									});
-									
-								break;
-								default:
-									cb();
-								break;
-							}
+						// Update the build log
+						scope.updateBuildLog(versions.new, function() {
+							// Check how long it took.
+							var timeEnd		= new Date().getTime();
+							
+							var duration	= timeEnd-timeStart;
+							
+							var tOutput = new table();
+							tOutput.push(
+								['Dev', buildResult.dev.join('\n')],
+								['Prod', buildResult.prod.join('\n')]
+							);
+							
+							var tVersion = new table();
+							tVersion.push(
+								['Previous version', 	versions.previous],
+								['New version', 		versions.new]
+							);
+							
+							console.log("");
+							console.log("Build finished without error in ".info+(duration+"ms").help+".".info);
+							console.log("");
+							
+							console.log(tOutput.toString());
+							console.log(tVersion.toString());
 						});
 						
-						
-						
-					}, {ext:ext});
-				}
-				
-				processStack.process(function() {
-					
-					// Check how long it took.
-					
-					var timeEnd		= new Date().getTime();
-					
-					var duration	= timeEnd-timeStart;
-					
-					var t = new table();
-					t.push(
-						['Dev', buildResult.dev.join('\n')],
-						['Prod', buildResult.prod.join('\n')]
-					);
-					
-					console.log("");
-					console.log("Build finished without error in ".info+(duration+"ms").help+".".info);
-					
-					console.log(t.toString());
-				}, true);
-			}, false);
+					}, false);
+				}, false);
+			});
 		});
 	});
-	
-	
-	
-	
-	/*
-	// 1.	Split the files by type (and list the files using their full path for further processing)
-	this.getConf(function() {
-		scope.filetypes = scope.groupByType(scope.data.files);
-		toolset.log("Files", scope.filetypes);
-		// 2.	Concat by type
-		scope.concat(function(concatList) {
-			// 3.	Build the required files (including less->css)
-			if (concatList['.less']) {
-				var css = scope.lessToCss(concatList['.less'], function(cssContent) {
-					/// If there was some css, concat
-				});
-				
-			}
-		});
-	});
-	*/
 	
 };
+builder.prototype.getOutputheader = function(version) {
+	
+	var t = new table();
+	t.push(
+		['Name', 				this.data.name],
+		['version', 			version],
+		['Last modified on', 	new Date().toISOString()],
+		['Last modified by', 	this.options.user.name+' <'+this.options.user.email+'>']
+	);
+	
+	return '/*\n'+(this.data.header?this.data.header+'\n':'')+t.toString().replace(/\u001b\[(?:\d*;){0,2}\d*m/g,'')+'\n*/\n';
+}
 
 builder.prototype.processFile = function(file, cb) {
 	var scope 	= this;
@@ -210,76 +234,81 @@ builder.prototype.lessToCss = function(lessContent, cb) {
 	});
 };
 
-builder.prototype.concat = function(cb) {
-	var scope = this;
-	var ext;
-	
-	var stack = new toolset.stack();
-	
-	var concat = {};
-	
-	for (ext in scope.filetypes) {
-		(function(ext) {
-			_.each(scope.filetypes[ext], function(file) {
-				switch (ext) {
-					case ".js":
-					case ".css":
-					case ".less":
-						if (!concat[ext]) {
-							concat[ext] = "";
-						}
-						stack.add(function(p, cb) {
-							toolset.file.read(file, function(content) {
-								concat[ext] += "\n\n/* "+file+" */\n"+content;
-								cb();
-							});
-						});
-					break;
-					default:
-						// Nothing
-					break;
-				}
-			});
-		})(ext);
-	}
-	
-	stack.process(function() {
-		cb(concat);
-	}, false);	// !async
-	
-}
-
-builder.prototype.groupByType = function(files) {
-	var scope = this;
-	var types = {};
-	
-	_.each(files, function(file) {
-		var ext = path.extname(file);
-		if (!types[ext]) {
-			types[ext] = [];
-		}
-		// Push the full filename, including full path
-		types[ext].push(path.normalize(scope.options.directory+'/'+file));
-	});
-	
-	return types;
-};
 builder.prototype.getConf = function(cb) {
 	var scope 	= this;
 	
 	toolset.file.toObject(this.options.file, function(data) {
+		// Fix the object, for missing properties
+		if (!data.buildlog) {
+			data.buildlog = [];
+		}
 		scope.data = data;
 		cb();
 	});
 };
 
-
-
-
-
-// Save the current build data into the build.json file
-builder.prototype.save = function() {
+builder.prototype.incrementVersion = function(type, cb) {
+	var scope 	= this;
 	
+	if (this.data.version[type] == undefined) {
+		this.data.version[type] = 0;
+	}
+	
+	var currentVersion = [this.data.version.major,this.data.version.minor,this.data.version.build].join('.');
+	
+	// Reset the proper subversions
+	switch (type) {
+		case "major":
+			this.data.version.minor = 0;
+			this.data.version.build = 0;
+		break;
+		case "minor":
+			this.data.version.build = 0;
+		break;
+	}
+	
+	this.data.version[type]++;
+	
+	var newVersion = [this.data.version.major,this.data.version.minor,this.data.version.build].join('.');
+	
+	// Write the changes
+	toolset.file.writeJson(this.options.file, this.data, function() {
+		cb({
+			previous:	currentVersion,
+			new:		newVersion
+		});
+	}, true);
+};
+
+builder.prototype.updateBuildLog = function(version, cb) {
+	var scope 	= this;
+	
+	this.data.buildlog.push({
+		date:		new Date().toISOString(),
+		author:		this.options.user,
+		version:	version
+	});
+	
+	// Write the changes
+	toolset.file.writeJson(this.options.file, this.data, function() {
+		cb();
+	}, true);
+};
+builder.prototype.saveAs = function(names, content, callback) {
+	var scope 	= this;
+	var stack = new toolset.stack();
+	
+	_.each(names, function(name) {
+		stack.add(function(p, cb) {
+			toolset.file.write(name, content, function() {
+				cb();
+			}, true);
+		});
+	});
+	
+	stack.process(function() {
+		callback();
+	}, true);
 };
 
 module.exports = builder;

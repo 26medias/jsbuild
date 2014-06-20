@@ -64,7 +64,7 @@ sbuild.prototype.displayArt = function(name, color) {
 		console.log(line[color]);
 	});
 }
-sbuild.prototype.build = function() {
+sbuild.prototype.build = function(versionType) {
 	var scope = this;
 	// get the login data
 	this.getLoginData(function(loginData) {
@@ -93,7 +93,7 @@ sbuild.prototype.build = function() {
 					file:		filename,
 					user:		loginData
 				});
-				b.build();
+				b.build(versionType);
 			});
 		});
 	});

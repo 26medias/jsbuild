@@ -41,9 +41,9 @@ program.command('logout').action(function(){
 	});
 });
 
-program.command('build').action(function(){
+program.command('build [version]').action(function(version){
 	
-	sbuild.build();
+	sbuild.build(version);
 	
 });
 

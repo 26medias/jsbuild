@@ -6,7 +6,7 @@
 	},
 	"name": "sbuild",
 	"description": "sbuild CLI",
-	"version": "0.0.1",
+	"version": "0.0.3",
 	"homepage": "https://github.com/26medias/sbuild",
 	"licenses": [
 	{
@@ -42,6 +42,6 @@
 		"sbuild": "./sbuild"
 	},
 	"readmeFilename": "README.md",
-	"_id": "sbuild@0.0.1",
+	"_id": "sbuild@0.0.3",
 	"_from": "sbuild@*"
 }
