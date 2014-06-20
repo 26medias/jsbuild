@@ -1,0 +1,47 @@
+{
+	"author": {
+		"name": "Julien Loutre",
+		"email": "julien@twenty-six-medias.com",
+		"url": "http://www.twenty-six-medias.com/"
+	},
+	"name": "sbuild",
+	"description": "sbuild CLI",
+	"version": "0.0.1",
+	"homepage": "https://github.com/26medias/sbuild",
+	"licenses": [
+	{
+		"type": "BSD-2-Clause",
+		"url": "https://raw.github.com/26medias/sbuild/master/LICENSE"
+	}
+	],
+	"repository": {
+		"type": "git",
+		"url": "git://github.com/26medias/sbuild.git"
+	},
+	"main": "./sbuild",
+	"engines": {
+		"node": "*"
+	},
+	"dependencies": {
+		"commander": 	"latest",
+		"underscore":	"latest",
+		"toolset":		"latest",
+		"tar.gz":		"latest",
+		"shelljs":		"latest",
+		"prompt":		"latest",
+		"lingo":		"latest",
+		"colors":		"latest",
+		"open":			"latest",
+		"cli-table":	"latest",
+		"minify":		"latest",
+		"less":			"latest",
+		"node-minify":	"latest"
+	},
+	"preferGlobal":		"true",
+	"bin": {
+		"sbuild": "./sbuild"
+	},
+	"readmeFilename": "README.md",
+	"_id": "sbuild@0.0.1",
+	"_from": "sbuild@*"
+}

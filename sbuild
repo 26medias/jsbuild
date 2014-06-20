@@ -1,0 +1,92 @@
+#!/usr/bin/env node
+
+var version = "0.0.1";
+
+var _ 			= require('underscore');
+var targz 		= require('tar.gz');
+var toolset 	= require('toolset');
+var sh 			= require("shelljs");
+var program 	= require('commander');
+var prompt 		= require('prompt');
+var lingo 		= require('lingo');
+var colors 		= require('colors');
+var path 		= require('path');
+var table 		= require('cli-table');
+var sbuild 		= require('./bin/sbuild');
+sbuild.directory= sh.pwd();	// Current working directory
+sbuild.version	= version;
+sbuild.init();
+
+colors.setTheme({
+	silly: 'rainbow',
+	input: 'grey',
+	verbose: 'cyan',
+	prompt: 'grey',
+	info: 'green',
+	data: 'grey',
+	help: 'cyan',
+	warn: 'yellow',
+	debug: 'blue',
+	error: 'red'
+});
+
+
+
+program.version(version);
+
+
+program.command('logout').action(function(){
+	sbuild.logout(function() {
+		console.log("You have been logged out.".error);
+	});
+});
+
+program.command('build').action(function(){
+	
+	sbuild.build();
+	
+});
+
+program.command('status').action(function(url, name){
+	var filename = sbuild.directory+"/build.json";
+	toolset.file.exists(filename, function(exists) {
+		if (!exists) {
+			console.log("");
+			console.log("This doesn't seem to be a sbuild project.".error);
+			console.log("the file ".error+"build.json".warn+" is not present in your current directory.".error);
+			console.log("Use"+" sbuild create".data+" to create a new project.");
+			return false;
+		}
+		
+		toolset.file.toObject(filename, function(data) {
+			if (!data) {
+				console.log("");
+				console.log("Your build.json file is not valid JSON. Please fix that file and retry.".error);
+				return false;
+			}
+			sbuild.displayArt('status');
+			var t = new table();
+			t.push(
+				['Project Name', data.name],
+				['Version', data.version.major+"."+data.version.minor+"."+data.version.build],
+				['Output', data.output]
+			);
+			console.log(t.toString());
+			
+			sbuild.displayArt('files');
+			
+			var t = new table();
+			var c = 0;
+			_.each(data.files, function(file) {
+				c++;
+				t.push([c, file])
+			});
+			console.log(t.toString());
+		});
+	});
+});
+
+program.command('*').action(function(env){
+	console.log('Please enter a Valid command');
+});
+program.parse(process.argv);
